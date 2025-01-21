@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -40,6 +41,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart2;
@@ -53,7 +56,13 @@ uint32_t pMillis, cMillis;
 float tCelsius = 0;
 float tFahrenheit = 0;
 float RH = 0;
-uint8_t txBuffer[50];
+uint8_t txBuffer[100];
+
+uint16_t readValue;
+float soil_moisture;
+uint16_t minADC = 1200;
+uint16_t maxADC = 3000;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -61,6 +70,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -144,7 +154,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+   HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -161,50 +171,89 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   MX_USART2_UART_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start(&htim1);
+  HAL_ADC_Start(&hadc1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
+      /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+      /* USER CODE BEGIN 3 */
       if (DHT22_Start()) {
+          // Read DHT22 sensor data
           RH1 = DHT22_Read();
           RH2 = DHT22_Read();
           TC1 = DHT22_Read();
           TC2 = DHT22_Read();
           SUM = DHT22_Read();
 
+          // Verify checksum
           CHECK = RH1 + RH2 + TC1 + TC2;
           if (CHECK == SUM) {
+              // Calculate temperature in Celsius
               if (TC1 > 127) { // Negative temperature
                   tCelsius = (float)TC2 / 10 * (-1);
               } else {
                   tCelsius = (float)((TC1 << 8) | TC2) / 10;
               }
+              // Convert to Fahrenheit
               tFahrenheit = tCelsius * 9 / 5 + 32;
+
+              // Calculate relative humidity
               RH = (float)((RH1 << 8) | RH2) / 10;
           }
       }
-      // Send temperature and humidity as integers multiplied by 10
+
+      // Scale temperature and humidity for easier formatting
       int16_t tCelsiusScaled = (int16_t)(tCelsius * 10);
       int16_t RHScaled = (int16_t)(RH * 10);
 
-      // Format as integers and send
-      sprintf((char *)txBuffer, "Temperature:%d.%dC,Humidity:%d.%d%%\n",
-              tCelsiusScaled / 10, tCelsiusScaled % 10,
-              RHScaled / 10, RHScaled % 10);
+      // --------- Read soil moisture
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); // Enable sensor
+      HAL_Delay(100); // Wait 100 ms for stabilization
 
-      // Send the string over UART2
+      // Read ADC raw value
+      HAL_ADC_PollForConversion(&hadc1, 1000);
+      readValue = HAL_ADC_GetValue(&hadc1); // Get raw ADC value
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // Disable sensor
+
+      // Clamp ADC value within valid range
+      if (readValue < minADC) {
+          readValue = minADC;
+      } else if (readValue > maxADC) {
+          readValue = maxADC;
+      }
+
+      // Calculate soil moisture percentage
+      soil_moisture = (1.0 - ((float)(readValue - minADC) / (float)(maxADC - minADC))) * 100.0;
+
+      // Apply moving average for smoothing
+      static float previousMoisture = 0;
+      soil_moisture = 0.9 * previousMoisture + 0.1 * soil_moisture;
+      previousMoisture = soil_moisture;
+
+      // Scale soil moisture for easier formatting
+      int16_t soilMoistureScaled = (int16_t)(soil_moisture * 10);
+
+      // Format data into a string
+      sprintf((char *)txBuffer,
+          "Temperature:%d.%dC,Humidity:%d.%d%%,Soil Moisture:%d.%d%%\n",
+          tCelsiusScaled / 10, tCelsiusScaled % 10,
+          RHScaled / 10, RHScaled % 10,
+          soilMoistureScaled / 10, soilMoistureScaled % 10);
+
+      // Send the formatted string over UART2
       HAL_UART_Transmit(&huart2, txBuffer, strlen((char *)txBuffer), HAL_MAX_DELAY);
 
-      HAL_Delay(4000);  // Wait 1 second
-
+      // Delay 10 seconds
+      HAL_Delay(10000);
   }
+
   /* USER CODE END 3 */
 }
 
@@ -251,6 +300,64 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.LowPowerAutoPowerOff = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_1CYCLE_5;
+  hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_1CYCLE_5;
+  hadc1.Init.OversamplingMode = DISABLE;
+  hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_9;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -362,6 +469,7 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
