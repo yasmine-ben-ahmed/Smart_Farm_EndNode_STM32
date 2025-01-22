@@ -27,25 +27,25 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   ALLOC
  11 .ARM.attributes 00000028  00000000  00000000  00008060  2**0
                   CONTENTS, READONLY
- 12 .debug_info   00010a16  00000000  00000000  00008088  2**0
+ 12 .debug_info   00010a05  00000000  00000000  00008088  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 13 .debug_abbrev 000020b3  00000000  00000000  00018a9e  2**0
+ 13 .debug_abbrev 000020c6  00000000  00000000  00018a8d  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  14 .debug_aranges 00000f38  00000000  00000000  0001ab58  2**3
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  15 .debug_rnglists 00000bfd  00000000  00000000  0001ba90  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 16 .debug_macro  00017331  00000000  00000000  0001c68d  2**0
+ 16 .debug_macro  000172cb  00000000  00000000  0001c68d  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_line   00012029  00000000  00000000  000339be  2**0
+ 17 .debug_line   00012003  00000000  00000000  00033958  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    000983e6  00000000  00000000  000459e7  2**0
+ 18 .debug_str    0009836d  00000000  00000000  0004595b  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  000dddcd  2**0
+ 19 .comment      00000043  00000000  00000000  000ddcc8  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  00003ed4  00000000  00000000  000dde10  2**2
+ 20 .debug_frame  00003ed4  00000000  00000000  000ddd0c  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 0000004b  00000000  00000000  000e1ce4  2**0
+ 21 .debug_line_str 0000004b  00000000  00000000  000e1be0  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -4704,7 +4704,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-   HAL_Init();
+  HAL_Init();
  80024d0:	f000 fcfc 	bl	8002ecc <HAL_Init>
   /* USER CODE BEGIN Init */
 
@@ -4737,9 +4737,9 @@ int main(void)
  80024f4:	f001 f888 	bl	8003608 <HAL_ADC_Start>
   while (1)
   {
-      /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-      /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
       if (DHT22_Start()) {
  80024f8:	f7ff feec 	bl	80022d4 <DHT22_Start>
  80024fc:	1e03      	subs	r3, r0, #0
